@@ -1,0 +1,6 @@
+# init-build-env wrapper created by bitbake-setup
+cd /home/jhj/bitbake-builds/poky-whinlatter/layers/openembedded-core
+set /home/jhj/bitbake-builds/poky-whinlatter/build
+. ./oe-init-build-env
+set --
+

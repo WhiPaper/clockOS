@@ -1,0 +1,14 @@
+[Unit]
+Description=Clock GUI Application
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/clockOS_gui
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+Environment=LV_DRM_CARD=/dev/dri/card2
+
+[Install]
+WantedBy=multi-user.target

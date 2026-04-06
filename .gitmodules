@@ -1,0 +1,20 @@
+[submodule "layers/meta-yocto"]
+	path = layers/meta-yocto
+	url = https://git.yoctoproject.org/meta-yocto.git
+	branch = whinlatter
+[submodule "layers/meta-openembedded"]
+	path = layers/meta-openembedded
+	url = https://git.openembedded.org/meta-openembedded.git
+	branch = whinlatter
+[submodule "layers/openembedded-core"]
+	path = layers/openembedded-core
+	url = https://git.openembedded.org/openembedded-core.git
+	branch = whinlatter
+[submodule "layers/bitbake"]
+	path = layers/bitbake
+	url = https://git.openembedded.org/bitbake
+	branch = 2.16
+[submodule "layers/meta-raspberrypi"]
+	path = layers/meta-raspberrypi
+	url = https://git.yoctoproject.org/meta-raspberrypi
+	branch = whinlatter

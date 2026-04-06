@@ -1,0 +1,11 @@
+Poky - The Yocto Project testing distribution
+
+Additional information is in /home/jhj/bitbake-builds/poky-whinlatter/build/conf/conf-summary.txt and /home/jhj/bitbake-builds/poky-whinlatter/build/conf/conf-notes.txt
+
+Source the environment using '. /home/jhj/bitbake-builds/poky-whinlatter/build/init-build-env' to run builds from the command line.
+
+Run 'bitbake-config-build enable-fragment <fragment-name>' to enable additional fragments or replace built-in ones (e.g. machine/<name> or distro/<name> to change MACHINE or DISTRO).
+
+The bitbake configuration files (local.conf, bblayers.conf and more) can be found in /home/jhj/bitbake-builds/poky-whinlatter/build/conf
+
+To edit the code in VSCode, open the workspace: code /home/jhj/bitbake-builds/poky-whinlatter/bitbake.code-workspace
