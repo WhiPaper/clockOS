@@ -1,0 +1,145 @@
+{
+    "bitbake-config": {
+        "bb-layers": [
+            "openembedded-core/meta",
+            "meta-yocto/meta-yocto-bsp",
+            "meta-yocto/meta-poky"
+        ],
+        "description": "Poky - The Yocto Project testing distribution",
+        "name": "poky",
+        "oe-fragment-choices": {
+            "distro": "distro/poky",
+            "machine": "machine/genericarm64"
+        },
+        "oe-fragments-one-of": {
+            "distro": {
+                "description": "Target Distributions",
+                "options": [
+                    "distro/poky",
+                    "distro/poky-altcfg",
+                    "distro/poky-tiny"
+                ]
+            },
+            "machine": {
+                "description": "Target machines",
+                "options": [
+                    "machine/qemux86-64",
+                    "machine/qemuarm64",
+                    "machine/qemuriscv64",
+                    "machine/genericarm64",
+                    "machine/genericx86-64"
+                ]
+            }
+        },
+        "setup-dir-name": "$distro-whinlatter"
+    },
+    "data": {
+        "bitbake-setup": {
+            "configurations": [
+                {
+                    "bb-layers": [
+                        "openembedded-core/meta",
+                        "meta-yocto/meta-yocto-bsp",
+                        "meta-yocto/meta-poky"
+                    ],
+                    "configurations": [
+                        {
+                            "description": "Poky - The Yocto Project testing distribution",
+                            "name": "poky"
+                        },
+                        {
+                            "description": "Poky - The Yocto Project testing distribution with internet sstate acceleration. Use with caution as it requires a completely robust local network with sufficient bandwidth.",
+                            "name": "poky-with-sstate",
+                            "oe-fragments": [
+                                "core/yocto/sstate-mirror-cdn"
+                            ]
+                        }
+                    ],
+                    "oe-fragments-one-of": {
+                        "distro": {
+                            "description": "Target Distributions",
+                            "options": [
+                                "distro/poky",
+                                "distro/poky-altcfg",
+                                "distro/poky-tiny"
+                            ]
+                        },
+                        "machine": {
+                            "description": "Target machines",
+                            "options": [
+                                "machine/qemux86-64",
+                                "machine/qemuarm64",
+                                "machine/qemuriscv64",
+                                "machine/genericarm64",
+                                "machine/genericx86-64"
+                            ]
+                        }
+                    },
+                    "setup-dir-name": "$distro-whinlatter"
+                }
+            ]
+        },
+        "description": "Poky - The Yocto Project testing distribution configurations and hardware test platforms, release 5.3 'whinlatter'",
+        "expires": "2026-05-31",
+        "sources": {
+            "bitbake": {
+                "git-remote": {
+                    "branch": "2.16",
+                    "remotes": {
+                        "origin": {
+                            "uri": "https://git.openembedded.org/bitbake"
+                        }
+                    },
+                    "rev": "2.16"
+                }
+            },
+            "meta-yocto": {
+                "git-remote": {
+                    "branch": "whinlatter",
+                    "remotes": {
+                        "origin": {
+                            "uri": "https://git.yoctoproject.org/meta-yocto"
+                        }
+                    },
+                    "rev": "whinlatter"
+                }
+            },
+            "openembedded-core": {
+                "git-remote": {
+                    "branch": "whinlatter",
+                    "remotes": {
+                        "origin": {
+                            "uri": "https://git.openembedded.org/openembedded-core"
+                        }
+                    },
+                    "rev": "whinlatter"
+                }
+            },
+            "yocto-docs": {
+                "git-remote": {
+                    "branch": "whinlatter",
+                    "remotes": {
+                        "origin": {
+                            "uri": "https://git.yoctoproject.org/yocto-docs"
+                        }
+                    },
+                    "rev": "whinlatter"
+                }
+            }
+        },
+        "version": "1.0"
+    },
+    "name": "poky-whinlatter",
+    "non-interactive-cmdline-options": [
+        "poky-whinlatter",
+        "poky",
+        "distro/poky",
+        "machine/genericarm64"
+    ],
+    "registry": "/home/jhj/bitbake/default-registry",
+    "skip-selection": null,
+    "source-overrides": {
+        "sources": {}
+    },
+    "type": "registry"
+}
