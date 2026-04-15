@@ -10,16 +10,13 @@ BOOT_SPACE = "262144"
 IMAGE_INSTALL += " \
     packagegroup-core-boot \
     clock-gui \
+    earsys \
     kernel-modules \
-    libgpiod \
     python3 \
-    python3-numpy \
-    python3-opencv \
     libpisp \
     libcamera \
     libcamera-apps \
-    libdrm \
-    connman \
     bluez5 \
-    wpa-supplicant \
+    iwd \
+    linux-firmware-rpidistro-bcm43455 \
 "

@@ -1,0 +1,15 @@
+[Unit]
+Description=EARSYS Drowsiness Detection Service
+After=multi-user.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/earsys
+ExecStart=/usr/bin/python3 /opt/earsys/main.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,9 @@
 SUMMARY = "A custom Yocto image for Clock OS (Development)"
 DESCRIPTION = "Development image inheriting the production clockos-image. \
 Adds SSH access, debuggers, hardware inspection tools, and serial console \
-for iterative development on Raspberry Pi 5."
+for iterative development on Raspberry Pi 5. \
+Includes C/C++ toolchain (gcc, g++, cmake, gdb) and Python 3 \
+development environment for on-device development and testing."
 LICENSE = "MIT"
 
 require clockos-image.bb
@@ -17,14 +19,26 @@ IMAGE_INSTALL += " \
     i2c-tools \
     minicom \
     libdrm-tests \
+    \
+    cmake \
+    ninja \
+    ltrace \
+    \
+    python3-pip \
+    python3-dev \
+    python3-modules \
+    python3-setuptools \
+    python3-wheel \
 "
 
 IMAGE_FEATURES += " \
     ssh-server-dropbear \
     tools-debug \
+    tools-sdk \
     allow-empty-password \
     empty-root-password \
     post-install-logging \
     allow-root-login \
     package-management \
+    dev-pkgs \
 "
