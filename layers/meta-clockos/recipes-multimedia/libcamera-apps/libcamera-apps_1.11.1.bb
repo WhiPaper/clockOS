@@ -14,6 +14,8 @@ SRC_URI = "\
 PV = "1.11.1+git${SRCPV}"
 SRCREV = "2ebb5820566f2efa64d812c6fbceac94d5799f86"
 
+S = "${WORKDIR}/git"
+
 DEPENDS = "libcamera libexif jpeg tiff libpng boost"
 
 PACKAGECONFIG ??= "drm"

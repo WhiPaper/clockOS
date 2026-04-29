@@ -13,6 +13,8 @@ SRC_URI = "git://github.com/raspberrypi/libcamera.git;protocol=https;branch=main
 PV = "0.7.0+rpt20260205+git${SRCPV}"
 SRCREV = "9f4754cbc6f9ae2276c9e2f42db9302e64c723b5"
 
+S = "${WORKDIR}/git"
+
 PE = "1"
 
 DEPENDS = "\
@@ -35,10 +37,13 @@ PACKAGECONFIG ??= "dng gst pycamera"
 PACKAGECONFIG[dng] = ",,tiff"
 PACKAGECONFIG[gst] = "-Dgstreamer=enabled,-Dgstreamer=disabled,gstreamer1.0 gstreamer1.0-plugins-base"
 PACKAGECONFIG[pycamera] = "-Dpycamera=enabled,-Dpycamera=disabled,python3 python3-pybind11"
-PACKAGECONFIG[pisp] = "-Dpipelines=rpi/pisp -Dipas=rpi/pisp, -Dpipelines=rpi/vc4 -Dipas=rpi/vc4, libpisp"
+PACKAGECONFIG[pisp] = ",,libpisp"
+PACKAGECONFIG[raspberrypi] = ""
 
-# machines which uses pisp
+# raspberrypi (from meta-raspberrypi) enables vc4; add pisp on raspberrypi5.
+PACKAGECONFIG:remove:rpi = " raspberrypi"
 PACKAGECONFIG:append:raspberrypi5 = " pisp"
+EXTRA_OEMESON:append:raspberrypi5 = " -Dpipelines=rpi/vc4,rpi/pisp -Dipas=rpi/vc4,rpi/pisp"
 
 EXTRA_OEMESON = " \
     -Dv4l2=enabled \
@@ -83,7 +88,7 @@ FILES:${PN} += "\
     ${datadir}/libcamera/pipeline/rpi/* \
     ${datadir}/libcamera/ipa/rpi* \
 "
-FILES:${PN}-gst = "${libdir}/gstreamer-1.0"
+FILES:${PN}-gst = "${libdir}/gstreamer-1.0/*"
 FILES:${PN}-pycamera = "${PYTHON_SITEPACKAGES_DIR}/libcamera"
 
 # libcamera-v4l2 explicitly sets _FILE_OFFSET_BITS=32 to get access to

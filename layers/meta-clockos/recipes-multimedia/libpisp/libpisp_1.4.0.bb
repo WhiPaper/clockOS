@@ -8,6 +8,8 @@ SRC_URI = "git://github.com/raspberrypi/libpisp.git;protocol=https;branch=main"
 PV = "1.4.0+git${SRCPV}"
 SRCREV = "cc4b18f7da24a36f9c9d2932fe97bd269104a736"
 
+S = "${WORKDIR}/git"
+
 inherit meson pkgconfig
 
 DEPENDS = "\
