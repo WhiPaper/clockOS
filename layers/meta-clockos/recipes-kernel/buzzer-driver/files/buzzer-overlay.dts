@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * buzzer-overlay.dts – Device Tree overlay for clockOS passive buzzer driver
+ *
+ * Creates a "clockos,buzzer" platform device that references the RP1 PWM1
+ * channel (GPIO 13, BCM) used by the KY-006 passive buzzer.
+ *
+ * Prerequisites in config.txt (order matters):
+ *   dtoverlay=pwm-2chan,pin2=13,func2=4   # mux GPIO 13 → RP1 PWM channel 1
+ *   dtoverlay=buzzer                       # register buzzer platform device
+ *
+ * pwms cell format: <phandle channel period_ns polarity>
+ *
+ *   rp1_pwm0  : RP1 PWM block 0 (pwmchip0 visible in /sys/class/pwm/)
+ *   channel 1 : GPIO 13 / PWM1 (channel 0 = GPIO 12 / PWM0)
+ *   500000 ns : 2 kHz default period (driver overrides at runtime)
+ *   0         : PWM_POLARITY_NORMAL
+ *
+ * To verify after boot:
+ *   ls /sys/bus/platform/devices/ | grep buzzer
+ *   ls /dev/buzzer
+ */
+
+/dts-v1/;
+/plugin/;
+
+&{/} {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	buzzer: buzzer@0 {
+		compatible = "clockos,buzzer";
+		pwms = <&rp1_pwm0 1 500000 0>;
+		pwm-names = "buzzer";
+		status = "okay";
+	};
+};

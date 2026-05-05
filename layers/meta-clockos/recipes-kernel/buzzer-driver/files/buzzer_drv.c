@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * buzzer_drv.c – Passive Buzzer Character Device Driver
+ * buzzer_drv.c – Passive Buzzer Character Device Driver (platform_driver)
  *
  * Hardware: KY-006 Passive Buzzer Module
- *           GPIO 13 (BCM) wired to signal pin, hardware PWM1 (RP1).
+ *           GPIO 13 (BCM) → Hardware PWM1 (RP1, pwmchip0 channel 1)
  *           Rated oscillation range: 1500 ~ 2500 Hz
+ *
+ * Requires Device Tree overlay "buzzer" which creates a "clockos,buzzer"
+ * platform node with a "pwms" property.  See buzzer-overlay.dts.
+ *
+ * config.txt:
+ *   dtoverlay=pwm-2chan,pin2=13,func2=4   # mux GPIO 13 → RP1 PWM1
+ *   dtoverlay=buzzer                       # register platform device
  *
  * Interface: /dev/buzzer  (character device)
  *   ioctl BUZZER_SET_FREQ  – set frequency in Hz
  *   ioctl BUZZER_START     – start continuous tone
  *   ioctl BUZZER_STOP      – stop tone
  *   ioctl BUZZER_BEEP      – beep for N ms then auto-stop
- *
- * Module parameters:
- *   pwm_id  (int, default 1) – global PWM index
- *                              On RPi 5 with dtoverlay=pwm-2chan,pin2=13,func2=4
- *                              PWM1 is typically index 1.  Adjust if needed and
- *                              verify with: ls /sys/class/pwm/
  */
 
 #include <linux/module.h>
@@ -26,34 +27,24 @@
 #include <linux/device.h>
 #include <linux/uaccess.h>
 #include <linux/pwm.h>
-#include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/of.h>
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 
 #include "buzzer_drv.h"
 
-/* ---------- module parameters -------------------------------------------- */
-
-static int pwm_id = 1;
-module_param(pwm_id, int, 0444);
-MODULE_PARM_DESC(pwm_id, "Global PWM index for GPIO 13 / PWM1 (default: 1)");
-
-struct rp1_pwm_compat {
-	struct pwm_chip chip;
-};
-
-/* ---------- driver private data ------------------------------------------ */
-
 #define DRIVER_NAME "buzzer"
 #define CLASS_NAME  "buzzer"
+
+/* ---------- per-device private data -------------------------------------- */
 
 struct buzzer_dev {
 	struct pwm_device  *pwm;
 	struct cdev         cdev;
 	struct class       *cls;
-	struct device      *dev;
+	struct device      *chrdev;
 	dev_t               devno;
 
 	unsigned int        freq_hz;
@@ -63,18 +54,15 @@ struct buzzer_dev {
 	struct mutex        lock;
 };
 
-static struct buzzer_dev g_bdev;
-
 /* ---------- helpers ------------------------------------------------------- */
 
 /**
- * _apply_freq() – push current frequency to the PWM hardware.
- *
- * Caller must hold g_bdev.lock.
+ * _apply_freq() – push frequency to PWM hardware.
+ * Caller must hold bd->lock.
  */
 static int _apply_freq(struct buzzer_dev *bd, unsigned int hz)
 {
-	unsigned long period_ns, duty_ns;
+	unsigned long period_ns;
 	struct pwm_state state;
 
 	if (hz < BUZZER_FREQ_MIN)
@@ -84,51 +72,14 @@ static int _apply_freq(struct buzzer_dev *bd, unsigned int hz)
 
 	bd->freq_hz = hz;
 	period_ns   = 1000000000UL / hz;
-	duty_ns     = period_ns / 2;   /* 50 % duty cycle */
 
 	pwm_get_state(bd->pwm, &state);
 	state.period     = period_ns;
-	state.duty_cycle = duty_ns;
+	state.duty_cycle = period_ns / 2;   /* 50 % duty cycle */
 	state.polarity   = PWM_POLARITY_NORMAL;
-	/* keep enabled flag as-is; caller decides whether to enable */
+	/* enabled flag unchanged – caller decides */
 
 	return pwm_apply_might_sleep(bd->pwm, &state);
-}
-
-static struct pwm_device *buzzer_request_pwm(unsigned int global_pwm_id)
-{
-	struct device_node *np;
-	struct platform_device *pdev;
-	struct rp1_pwm_compat *rp1;
-	struct pwm_device *pwm;
-	int local_pwm_id;
-
-	np = of_find_compatible_node(NULL, NULL, "raspberrypi,rp1-pwm");
-	if (!np)
-		return ERR_PTR(-ENODEV);
-
-	pdev = of_find_device_by_node(np);
-	of_node_put(np);
-	if (!pdev)
-		return ERR_PTR(-ENODEV);
-
-	rp1 = platform_get_drvdata(pdev);
-	if (!rp1) {
-		put_device(&pdev->dev);
-		return ERR_PTR(-ENODEV);
-	}
-
-	if ((int)global_pwm_id < rp1->chip.base ||
-	    (int)global_pwm_id >= rp1->chip.base + (int)rp1->chip.npwm) {
-		put_device(&pdev->dev);
-		return ERR_PTR(-EINVAL);
-	}
-
-	local_pwm_id = global_pwm_id - rp1->chip.base;
-	pwm = pwm_request_from_chip(&rp1->chip, local_pwm_id, DRIVER_NAME);
-	put_device(&pdev->dev);
-
-	return pwm;
 }
 
 /* ---------- delayed-work handler (auto-stop after BUZZER_BEEP) ----------- */
@@ -151,7 +102,10 @@ static void beep_stop_fn(struct work_struct *work)
 
 static int buzzer_open(struct inode *inode, struct file *file)
 {
-	file->private_data = &g_bdev;
+	/* Recover buzzer_dev from the embedded cdev */
+	struct buzzer_dev *bd = container_of(inode->i_cdev,
+					     struct buzzer_dev, cdev);
+	file->private_data = bd;
 	return 0;
 }
 
@@ -171,6 +125,14 @@ static long buzzer_ioctl(struct file *file,
 	if (_IOC_TYPE(cmd) != BUZZER_IOC_MAGIC)
 		return -ENOTTY;
 
+	/*
+	 * cancel_delayed_work_sync() must be called WITHOUT holding bd->lock,
+	 * because beep_stop_fn() also acquires bd->lock.  Calling _sync()
+	 * inside the lock would deadlock if the work is currently running.
+	 */
+	if (cmd == BUZZER_START || cmd == BUZZER_STOP || cmd == BUZZER_BEEP)
+		cancel_delayed_work_sync(&bd->beep_stop_work);
+
 	mutex_lock(&bd->lock);
 
 	switch (cmd) {
@@ -188,7 +150,6 @@ static long buzzer_ioctl(struct file *file,
 
 	/* ---- BUZZER_START ---- */
 	case BUZZER_START:
-		cancel_delayed_work(&bd->beep_stop_work);
 		pwm_get_state(bd->pwm, &state);
 		state.enabled = true;
 		ret = pwm_apply_might_sleep(bd->pwm, &state);
@@ -198,7 +159,6 @@ static long buzzer_ioctl(struct file *file,
 
 	/* ---- BUZZER_STOP ---- */
 	case BUZZER_STOP:
-		cancel_delayed_work(&bd->beep_stop_work);
 		pwm_get_state(bd->pwm, &state);
 		state.enabled = false;
 		pwm_apply_might_sleep(bd->pwm, &state);
@@ -215,7 +175,6 @@ static long buzzer_ioctl(struct file *file,
 			ret = -EINVAL;
 			break;
 		}
-		cancel_delayed_work(&bd->beep_stop_work);
 		pwm_get_state(bd->pwm, &state);
 		state.enabled = true;
 		ret = pwm_apply_might_sleep(bd->pwm, &state);
@@ -241,22 +200,32 @@ static const struct file_operations buzzer_fops = {
 	.unlocked_ioctl = buzzer_ioctl,
 };
 
-/* ---------- module init / exit ------------------------------------------- */
+/* ---------- platform_driver probe / remove -------------------------------- */
 
-static int __init buzzer_init(void)
+static int buzzer_probe(struct platform_device *pdev)
 {
-	struct buzzer_dev *bd = &g_bdev;
+	struct buzzer_dev *bd;
 	struct pwm_state   state;
 	int ret;
 
-	/* Request PWM channel by global index */
-	bd->pwm = buzzer_request_pwm(pwm_id);
+	bd = devm_kzalloc(&pdev->dev, sizeof(*bd), GFP_KERNEL);
+	if (!bd)
+		return -ENOMEM;
+
+	/*
+	 * devm_pwm_get() reads the "pwms" DT property and requests the
+	 * PWM channel described there.  The PWM is automatically released
+	 * when the platform device is unbound (after remove() returns).
+	 *
+	 * Returns -EPROBE_DEFER if the PWM provider is not ready yet,
+	 * causing the kernel to retry probe() later.
+	 */
+	bd->pwm = devm_pwm_get(&pdev->dev, NULL);
 	if (IS_ERR(bd->pwm)) {
-		pr_err("buzzer: pwm request(%d) failed: %ld\n",
-		       pwm_id, PTR_ERR(bd->pwm));
-		pr_err("buzzer: ensure dtoverlay=pwm-2chan,pin2=13,func2=4 "
-		       "is active, or pass pwm_id=<N> matching your PWM chip\n");
-		return PTR_ERR(bd->pwm);
+		ret = PTR_ERR(bd->pwm);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "devm_pwm_get failed: %d\n", ret);
+		return ret;
 	}
 
 	mutex_init(&bd->lock);
@@ -264,7 +233,7 @@ static int __init buzzer_init(void)
 	bd->freq_hz = BUZZER_FREQ_DEFAULT;
 	bd->running = false;
 
-	/* Configure default frequency, keep disabled */
+	/* Configure default frequency, output disabled */
 	pwm_init_state(bd->pwm, &state);
 	state.period     = 1000000000UL / BUZZER_FREQ_DEFAULT;
 	state.duty_cycle = state.period / 2;
@@ -272,22 +241,22 @@ static int __init buzzer_init(void)
 	state.enabled    = false;
 	ret = pwm_apply_might_sleep(bd->pwm, &state);
 	if (ret) {
-		pr_err("buzzer: initial pwm_apply failed: %d\n", ret);
-		goto err_pwm;
+		dev_err(&pdev->dev, "initial pwm_apply failed: %d\n", ret);
+		return ret;
 	}
 
-	/* Allocate chrdev region */
+	/* Register character device */
 	ret = alloc_chrdev_region(&bd->devno, 0, 1, DRIVER_NAME);
 	if (ret) {
-		pr_err("buzzer: alloc_chrdev_region failed: %d\n", ret);
-		goto err_pwm;
+		dev_err(&pdev->dev, "alloc_chrdev_region failed: %d\n", ret);
+		return ret;
 	}
 
 	cdev_init(&bd->cdev, &buzzer_fops);
 	bd->cdev.owner = THIS_MODULE;
 	ret = cdev_add(&bd->cdev, bd->devno, 1);
 	if (ret) {
-		pr_err("buzzer: cdev_add failed: %d\n", ret);
+		dev_err(&pdev->dev, "cdev_add failed: %d\n", ret);
 		goto err_region;
 	}
 
@@ -297,14 +266,17 @@ static int __init buzzer_init(void)
 		goto err_cdev;
 	}
 
-	bd->dev = device_create(bd->cls, NULL, bd->devno, NULL, DRIVER_NAME);
-	if (IS_ERR(bd->dev)) {
-		ret = PTR_ERR(bd->dev);
+	bd->chrdev = device_create(bd->cls, &pdev->dev,
+				   bd->devno, NULL, DRIVER_NAME);
+	if (IS_ERR(bd->chrdev)) {
+		ret = PTR_ERR(bd->chrdev);
 		goto err_class;
 	}
 
-	pr_info("buzzer: loaded → /dev/%s  pwm_id=%d  default=%u Hz\n",
-		DRIVER_NAME, pwm_id, bd->freq_hz);
+	platform_set_drvdata(pdev, bd);
+
+	dev_info(&pdev->dev, "loaded → /dev/%s  default=%u Hz\n",
+		 DRIVER_NAME, bd->freq_hz);
 	return 0;
 
 err_class:
@@ -313,37 +285,49 @@ err_cdev:
 	cdev_del(&bd->cdev);
 err_region:
 	unregister_chrdev_region(bd->devno, 1);
-err_pwm:
-	pwm_put(bd->pwm);
 	return ret;
 }
 
-static void __exit buzzer_exit(void)
+static int buzzer_remove(struct platform_device *pdev)
 {
-	struct buzzer_dev *bd = &g_bdev;
+	struct buzzer_dev *bd = platform_get_drvdata(pdev);
 	struct pwm_state   state;
 
 	cancel_delayed_work_sync(&bd->beep_stop_work);
 
-	mutex_lock(&bd->lock);
+	/* Stop PWM before devres releases it */
 	pwm_get_state(bd->pwm, &state);
 	state.enabled = false;
 	pwm_apply_might_sleep(bd->pwm, &state);
-	mutex_unlock(&bd->lock);
 
 	device_destroy(bd->cls, bd->devno);
 	class_destroy(bd->cls);
 	cdev_del(&bd->cdev);
 	unregister_chrdev_region(bd->devno, 1);
-	pwm_put(bd->pwm);
 
-	pr_info("buzzer: unloaded\n");
+	dev_info(&pdev->dev, "unloaded\n");
+	return 0;
 }
 
-module_init(buzzer_init);
-module_exit(buzzer_exit);
+/* ---------- driver registration ------------------------------------------ */
+
+static const struct of_device_id buzzer_of_match[] = {
+	{ .compatible = "clockos,buzzer" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, buzzer_of_match);
+
+static struct platform_driver buzzer_driver = {
+	.probe  = buzzer_probe,
+	.remove = buzzer_remove,
+	.driver = {
+		.name           = DRIVER_NAME,
+		.of_match_table = buzzer_of_match,
+	},
+};
+module_platform_driver(buzzer_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("clockOS");
 MODULE_DESCRIPTION("Passive Buzzer Character Device Driver – GPIO 13 / PWM1");
-MODULE_VERSION("1.0");
+MODULE_VERSION("1.1");
