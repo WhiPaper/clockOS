@@ -28,4 +28,7 @@ IMAGE_INSTALL += " \
     tzdata-asia \
     buzzer-driver \
     buzzer-driver-dev \
+    avahi-daemon \
+    openssl \
+    chrony \
 "

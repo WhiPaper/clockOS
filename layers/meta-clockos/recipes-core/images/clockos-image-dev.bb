@@ -9,6 +9,7 @@ require clockos-image.bb
 
 # Development and debugging tools
 IMAGE_INSTALL += " \
+    avahi-utils \
     htop \
     curl \
     libgpiod-tools \
