@@ -34,6 +34,6 @@ do_install:append() {
 FILES:${PN}     += "${nonarch_base_libdir}/udev/rules.d/99-buzzer.rules"
 FILES:${PN}-dev += "${includedir}/buzzer_drv.h ${includedir}/${BPN}/Module.symvers"
 
-RPROVIDES:${PN} += "kernel-module-buzzer-drv"
+RDEPENDS:${PN} += "kernel-module-buzzer-drv"
 
 KERNEL_MODULE_AUTOLOAD += "buzzer_drv"
