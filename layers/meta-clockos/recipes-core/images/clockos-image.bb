@@ -25,6 +25,7 @@ IMAGE_INSTALL += " \
     mesa \
     libv4l \
     tzdata \
+    tzdata-asia \
     buzzer-driver \
     buzzer-driver-dev \
 "
