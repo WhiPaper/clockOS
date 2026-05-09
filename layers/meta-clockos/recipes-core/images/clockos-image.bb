@@ -26,8 +26,7 @@ IMAGE_INSTALL += " \
     libv4l \
     tzdata \
     tzdata-asia \
-    buzzer-driver \
-    buzzer-driver-dev \
+    pwm-beeper-overlay \
     avahi-daemon \
     openssl \
     chrony \

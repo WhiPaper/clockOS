@@ -29,9 +29,8 @@
 	#size-cells = <0>;
 
 	buzzer: buzzer@0 {
-		compatible = "clockos,buzzer";
+		compatible = "pwm-beeper";
 		pwms = <&rp1_pwm0 1 500000 0>;
-		pwm-names = "buzzer";
 		status = "okay";
 	};
 };

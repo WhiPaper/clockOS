@@ -5,7 +5,9 @@ The two binaries communicate via @sleepcare/risk Unix domain socket."
 LICENSE = "CLOSED"
 
 SRC_URI = "gitsm://github.com/WhiPaper/sleepcare.git;protocol=https;branch=master \
-           file://sleepcare-gui.service"
+           file://sleepcare-gui.service \
+           file://pi_cert.pem \
+           file://pi_key.pem"
 
 SRCREV = "${AUTOREV}"
 SRCREV_lvgl = "${AUTOREV}"
@@ -41,4 +43,8 @@ do_install:append() {
                     ${D}${systemd_system_unitdir}/
     install -m 0644 ${S}/sleepcare-core/files/sleepcare-core.service \
                     ${D}${systemd_system_unitdir}/
+
+    install -d ${D}${sysconfdir}/sleepcare
+    install -m 0644 ${UNPACKDIR}/pi_cert.pem ${D}${sysconfdir}/sleepcare/
+    install -m 0600 ${UNPACKDIR}/pi_key.pem ${D}${sysconfdir}/sleepcare/
 }

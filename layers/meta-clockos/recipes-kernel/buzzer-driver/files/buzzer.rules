@@ -1,2 +1,0 @@
-# The 'video' group is used by sleepcare-gui for hardware access.
-SUBSYSTEM=="buzzer", KERNEL=="buzzer", GROUP="video", MODE="0660"
